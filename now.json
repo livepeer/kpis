@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "env": {
+    "LIVEPEER_KPI_DISCORD_BOT_API_KEY": "@livepeer_kpi_discord_bot_api_key",
+    "GITHUB_ACCESS_TOKEN": "@github_access_token"
+  }
+}

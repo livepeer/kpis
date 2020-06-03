@@ -1,16 +1,17 @@
 {
-  "name": "livepeer-charts",
-  "version": "0.1.0",
-  "private": true,
+  "name": "kpis",
+  "version": "0.0.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "d3-scale": "^3.2.1",
-    "graphql-request": "^1.8.2",
-    "next": "9.2.2",
+    "axios": "^0.19.2",
+    "graphql-request": "^2.0.0",
+    "moment": "^2.26.0",
+    "next": "^9.4.4",
+    "querystring": "^0.2.0",
     "react": "16.12.0",
     "react-dom": "16.12.0",
     "react-number-format": "^4.3.1",
