@@ -35,7 +35,9 @@ const Home = ({
         </h1>
 
         <div className="grid">
-          <h2 style={{ margin: 0 }}>API Total Fees (ETH): {apiFeesData.totalFees}</h2>
+          <h2 style={{ margin: 0 }}>
+            API Total Fees (ETH): {apiFeesData.totalFees}
+          </h2>
           <BarChart
             barDataKey="fees"
             xAxisDataKey="round"
@@ -190,7 +192,7 @@ async function getGithubComments() {
   return commentsArr.sort(function (a, b) {
     // Turn your strings into dates, and then subtract them
     // to get a value that is either negative, positive, or zero.
-    return new Date(a.date) - new Date(b.date);
+    return +new Date(a.date) - +new Date(b.date);
   });
 }
 
@@ -354,7 +356,7 @@ async function getStakeDistribution() {
 }
 
 async function getAPITickets() {
-  const genQuery = skip => `{
+  const genQuery = (skip) => `{
     winningTicketRedeemeds(where: { sender: "0xc3c7c4c8f7061b7d6a72766eee5359fe4f36e61e" }, skip: ${skip}, orderBy: timestamp, orderDirection: desc) {
       faceValue
       round {
@@ -367,7 +369,7 @@ async function getAPITickets() {
   let tickets = [];
   while (true) {
     const query = genQuery(skip);
-    const { winningTicketRedeemeds } = await request(SUBGRAPH_ENDPOINT, query)
+    const { winningTicketRedeemeds } = await request(SUBGRAPH_ENDPOINT, query);
     if (winningTicketRedeemeds.length == 0) {
       break;
     }
@@ -382,26 +384,31 @@ async function getAPITickets() {
 async function getAPIFees() {
   const tickets = await getAPITickets();
 
-  let roundFees = {}
+  let roundFees = {};
   let totalFees = Utils.toBN(0);
   tickets.forEach((ticket) => {
-    const round = ticket.round.id
-    const fees = Utils.toBN(ticket.faceValue)
+    const round = ticket.round.id;
+    const fees = Utils.toBN(ticket.faceValue);
 
     roundFees[round] = round in roundFees ? roundFees[round].add(fees) : fees;
-    totalFees = totalFees.add(fees)
-  })
+    totalFees = totalFees.add(fees);
+  });
 
-  let firstRound = parseInt(tickets[0].round.id)
-  let lastRound = parseInt(tickets[tickets.length - 1].round.id)
-  let dataArr = []
+  let firstRound = parseInt(tickets[0].round.id);
+  let lastRound = parseInt(tickets[tickets.length - 1].round.id);
+  let dataArr = [];
   for (let i = firstRound; i >= lastRound; i--) {
-    const round = i.toString()
-    dataArr.push({ round: round, fees: parseFloat(Utils.fromWei(roundFees[round] ? roundFees[round].toString() : "0")) })
+    const round = i.toString();
+    dataArr.push({
+      round: round,
+      fees: parseFloat(
+        Utils.fromWei(roundFees[round] ? roundFees[round].toString() : "0")
+      ),
+    });
   }
 
   return {
     feesPerRound: dataArr.reverse(),
-    totalFees: Utils.fromWei(totalFees)
-  }
+    totalFees: Utils.fromWei(totalFees),
+  };
 }
