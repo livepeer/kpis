@@ -7,10 +7,9 @@ import moment from "moment";
 import LineChart from "../components/LineChart";
 import axios from "axios";
 import { request } from "graphql-request";
-import Utils from "web3-utils";
 
 const SUBGRAPH_ENDPOINT =
-  "https://api.thegraph.com/subgraphs/name/livepeer/livepeer";
+  "https://api.thegraph.com/subgraphs/name/livepeer/livepeer-canary";
 
 const Home = ({
   aggregateGovernanceData,
@@ -59,13 +58,13 @@ const Home = ({
             data={stakeDistributionData}
           />
           <BarChart
-            barDataKey="totalMovedStake"
+            barDataKey="movedStake"
             xAxisDataKey="round"
             title="Stake Movement"
             data={stakeMovementData}
           />
           <BarChart
-            barDataKey="totalNewStake"
+            barDataKey="newStake"
             xAxisDataKey="round"
             title="New Stake"
             data={newStakeData}
@@ -105,7 +104,7 @@ export async function getStaticProps(context) {
       stakeDistributionData,
       apiFeesData,
     },
-    unstable_revalidate: true,
+    revalidate: 1,
   };
 }
 
@@ -273,11 +272,11 @@ export default Home;
 
 async function getNewStake() {
   const query = `{
-    rounds(orderBy: timestamp, orderDirection: desc) {
+    rounds(orderBy: startBlock, orderDirection: desc) {
       id
-      totalMovedStake
-      totalGeneratedFees
-      totalNewStake
+      movedStake
+      volumeUSD
+      newStake
     }
   }`;
 
@@ -286,9 +285,7 @@ async function getNewStake() {
   rounds.map((round) => {
     let obj = {
       round: round.id,
-      totalNewStake: parseFloat(
-        Utils.fromWei(round.totalNewStake ? round.totalNewStake : "0")
-      ),
+      newStake: +round.newStake,
     };
     dataArr.push(obj);
   });
@@ -297,11 +294,11 @@ async function getNewStake() {
 
 async function getStakeMovement() {
   const query = `{
-    rounds(orderBy: timestamp, orderDirection: desc) {
+    rounds(orderBy: startBlock, orderDirection: desc) {
       id
-      totalMovedStake
-      totalGeneratedFees
-      totalNewStake
+      movedStake
+      volumeUSD
+      newStake
     }
   }`;
 
@@ -310,9 +307,7 @@ async function getStakeMovement() {
   rounds.map((round) => {
     let obj = {
       round: round.id,
-      totalMovedStake: parseFloat(
-        Utils.fromWei(round.totalMovedStake ? round.totalMovedStake : "0")
-      ),
+      movedStake: +round.movedStake,
     };
     dataArr.push(obj);
   });
@@ -325,7 +320,7 @@ function onlyUnique(value, index, self) {
 
 async function getStakeDistribution() {
   const query = `{
-    rounds(orderBy: timestamp, orderDirection: desc) {
+    rounds(orderBy: startBlock, orderDirection: desc) {
       id
       startBlock
       pools {
@@ -343,7 +338,7 @@ async function getStakeDistribution() {
   rounds.map((round) => {
     let obj = { round: round.id };
     round.pools.map((pool) => {
-      const totalStake = parseFloat(Utils.fromWei(pool.totalStake));
+      const totalStake = +pool.totalStake;
       obj[pool.delegate.id] = totalStake;
       orchestratorArr.push(pool.delegate.id);
     });
@@ -357,7 +352,7 @@ async function getStakeDistribution() {
 
 async function getAPITickets() {
   const genQuery = (skip) => `{
-    winningTicketRedeemeds(where: { sender: "0xc3c7c4c8f7061b7d6a72766eee5359fe4f36e61e" }, skip: ${skip}, orderBy: timestamp, orderDirection: desc) {
+    winningTicketRedeemedEvents(where: { sender: "0xc3c7c4c8f7061b7d6a72766eee5359fe4f36e61e" }, skip: ${skip}, orderBy: timestamp, orderDirection: desc) {
       faceValue
       round {
         id
@@ -369,13 +364,16 @@ async function getAPITickets() {
   let tickets = [];
   while (true) {
     const query = genQuery(skip);
-    const { winningTicketRedeemeds } = await request(SUBGRAPH_ENDPOINT, query);
-    if (winningTicketRedeemeds.length == 0) {
+    const { winningTicketRedeemedEvents } = await request(
+      SUBGRAPH_ENDPOINT,
+      query
+    );
+    if (winningTicketRedeemedEvents.length == 0) {
       break;
     }
 
-    tickets.push(...winningTicketRedeemeds);
-    skip = winningTicketRedeemeds.length;
+    tickets.push(...winningTicketRedeemedEvents);
+    skip = winningTicketRedeemedEvents.length;
   }
 
   return tickets;
@@ -385,13 +383,13 @@ async function getAPIFees() {
   const tickets = await getAPITickets();
 
   let roundFees = {};
-  let totalFees = Utils.toBN(0);
+  let totalFees = 0;
   tickets.forEach((ticket) => {
     const round = ticket.round.id;
-    const fees = Utils.toBN(ticket.faceValue);
+    const fees = +ticket.faceValue;
 
-    roundFees[round] = round in roundFees ? roundFees[round].add(fees) : fees;
-    totalFees = totalFees.add(fees);
+    roundFees[round] = round in roundFees ? +roundFees[round] + fees : fees;
+    totalFees = totalFees + fees;
   });
 
   let firstRound = parseInt(tickets[0].round.id);
@@ -401,14 +399,12 @@ async function getAPIFees() {
     const round = i.toString();
     dataArr.push({
       round: round,
-      fees: parseFloat(
-        Utils.fromWei(roundFees[round] ? roundFees[round].toString() : "0")
-      ),
+      fees: roundFees[round] ? roundFees[round] : 0,
     });
   }
 
   return {
     feesPerRound: dataArr.reverse(),
-    totalFees: Utils.fromWei(totalFees),
+    totalFees,
   };
 }
